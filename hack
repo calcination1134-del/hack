@@ -1067,13 +1067,13 @@ local projectileEnabled = false
 local desyncDistValue = 3
 local currentTarget = nil
 
+-- Autofarm rage (same as main ragebot, height 18)
+local farmRageEnabled = false
+local farmRageHeight = 18
+
 -- TP behind enemy
 local behindTPEnabled = false
 local behindTPDistance = 3
-
--- Autofarm rage: teleport above enemy head
-local farmRageEnabled = false
-local farmRageHeight = 5
 
 -- Aimbot
 local aimbotEnabled = false
@@ -1217,7 +1217,7 @@ task.spawn(function()
 
             local _cachedObjId = nil
             _rageConn = RunService.Heartbeat:Connect(function()
-                if not projectileEnabled or not combatReady then return end
+                if not (projectileEnabled or farmRageEnabled) or not combatReady then return end
                 if not currentTarget or not currentTarget.Parent then return end
 
                 local targetChar = currentTarget:FindFirstAncestorOfClass("Model") or currentTarget.Parent
@@ -1290,7 +1290,8 @@ end
 RunService.Heartbeat:Connect(function()
     pcall(function()
         local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if projectileEnabled and combatReady and currentTarget and hrp and rageCanTeleport() and (not voidSpamEnabled or voidCanAct) then
+        local rageOn = projectileEnabled or farmRageEnabled
+        if rageOn and combatReady and currentTarget and hrp and rageCanTeleport() and (not voidSpamEnabled or voidCanAct) then
             local tChar = currentTarget:FindFirstAncestorOfClass("Model") or currentTarget.Parent
             local tPlr = Players:GetPlayerFromCharacter(tChar)
             if tPlr and isEnemyKatanaReflecting(tPlr) then return end
@@ -1298,7 +1299,12 @@ RunService.Heartbeat:Connect(function()
             RealVelocity = hrp.AssemblyLinearVelocity
 
             local targetPos = currentTarget.Position
-            local fakePos = targetPos + Vector3.new(0, desyncDistValue, 0)
+            -- main ragebot height 3; autofarm-only ragebot height 18
+            local height = desyncDistValue
+            if farmRageEnabled and not projectileEnabled then
+                height = farmRageHeight
+            end
+            local fakePos = targetPos + Vector3.new(0, height, 0)
             hrp.CFrame = CFrame.new(fakePos, targetPos)
             hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
         end
@@ -1320,7 +1326,7 @@ end)
 task.spawn(function()
     while true do
         task.wait(0.01)
-        if projectileEnabled and combatReady then
+        if (projectileEnabled or farmRageEnabled) and combatReady then
             local refPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position or Vector3.zero
             local closestPlayer = nil
             local shortestDistance = math.huge
@@ -1356,38 +1362,6 @@ task.spawn(function()
     end
 end)
 
--- Autofarm rage: stay above closest enemy head (height adjustable)
-RunService.Heartbeat:Connect(function()
-    if not farmRageEnabled then return end
-    pcall(function()
-        local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if not myHRP then return end
-
-        local closestHead, closestDist = nil, math.huge
-        local myPos = myHRP.Position
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character and not isSameTeam(player) then
-                if isEnemyImmune(player) then continue end
-                local hum = player.Character:FindFirstChildOfClass("Humanoid")
-                if not hum or hum.Health <= 0 then continue end
-                local head = getRageHead(player.Character)
-                if not head then continue end
-                local d = (head.Position - myPos).Magnitude
-                if d < closestDist then
-                    closestDist = d
-                    closestHead = head
-                end
-            end
-        end
-
-        if closestHead then
-            local above = closestHead.Position + Vector3.new(0, farmRageHeight, 0)
-            myHRP.CFrame = CFrame.new(above, closestHead.Position)
-            myHRP.AssemblyLinearVelocity = Vector3.zero
-        end
-    end)
-end)
-
 -- Continuously teleport behind closest enemy
 RunService.Heartbeat:Connect(function()
     if not behindTPEnabled then return end
@@ -1415,17 +1389,32 @@ RunService.Heartbeat:Connect(function()
         if closest then
             -- stand behind enemy (opposite of their look direction)
             local behindPos = closest.Position - closest.CFrame.LookVector * behindTPDistance
-            -- face the enemy (prefer head)
+            behindPos = Vector3.new(behindPos.X, closest.Position.Y, behindPos.Z)
+            -- face enemy back / torso for knife stab
             local lookAt = closest.Position
             local char = closest.Parent
             if char then
+                local torso = char:FindFirstChild("UpperTorso")
+                    or char:FindFirstChild("Torso")
+                    or char:FindFirstChild("HumanoidRootPart")
                 local head = char:FindFirstChild("HitboxHead")
                     or char:FindFirstChild("HitboxHeadSmall")
                     or char:FindFirstChild("Head")
-                if head then lookAt = head.Position end
+                if torso then
+                    lookAt = torso.Position
+                elseif head then
+                    lookAt = head.Position
+                end
             end
+            -- body faces enemy back
             myHRP.CFrame = CFrame.lookAt(behindPos, lookAt)
             myHRP.AssemblyLinearVelocity = Vector3.zero
+            -- camera keeps looking at enemy back as well
+            local cam = workspace.CurrentCamera
+            if cam then
+                local camPos = behindPos + Vector3.new(0, 1.6, 0)
+                cam.CFrame = CFrame.lookAt(camPos, lookAt)
+            end
         end
     end)
 end)
@@ -2036,10 +2025,366 @@ task.spawn(function()
     end
 end)
 
+
+-----------------------------------------------------------
+-- [UNLOCK ALL COSMETICS] (Skin/Charm/Dance/Wrap — no Finishers)
+-----------------------------------------------------------
+local unlockAllEnabled = false
+local unlockAllStarted = false
+
+local function startUnlockAll()
+    if unlockAllStarted then return end
+    unlockAllStarted = true
+    task.spawn(function()
+        local ok, err = pcall(function()
+            local RS = game:GetService("ReplicatedStorage")
+            local HttpService = game:GetService("HttpService")
+            local player = LocalPlayer
+            local playerScripts = player:WaitForChild("PlayerScripts", 10)
+            if not playerScripts then return end
+            local controllers = playerScripts:WaitForChild("Controllers", 10)
+            local modules = RS:WaitForChild("Modules", 10)
+
+            local EnumLibrary = nil
+            pcall(function()
+                EnumLibrary = require(modules:WaitForChild("EnumLibrary", 10))
+                if EnumLibrary and EnumLibrary.WaitForEnumBuilder then
+                    EnumLibrary:WaitForEnumBuilder()
+                end
+            end)
+
+            local CosmeticLibrary = require(modules:WaitForChild("CosmeticLibrary", 10))
+            local ItemLibrary = require(modules:WaitForChild("ItemLibrary", 10))
+            local DataController = require(controllers:WaitForChild("PlayerDataController", 10))
+
+            local equipped, favorites = {}, {}
+            local constructingWeapon, viewingProfile = nil, nil
+            local lastUsedWeapon = nil
+
+            local function isAllowedCosmetic(cosmetic, name)
+                if not cosmetic then return false end
+                local t = tostring(cosmetic.Type or "")
+                local n = string.lower(tostring(name or ""))
+                if t == "Finisher" or n:find("finisher", 1, true) then return false end
+                if t == "Skin" or t == "Charm" or t == "Dance" or t == "Emote" or t == "Wrap" or t == "Wrapping" then
+                    return true
+                end
+                if n:find("charm", 1, true) or n:find("dance", 1, true) or n:find("emote", 1, true) or n:find("wrap", 1, true) then
+                    return true
+                end
+                return false
+            end
+
+            local function cloneCosmetic(name, cosmeticType, options)
+                local base = CosmeticLibrary.Cosmetics[name]
+                if not base then return nil end
+                local data = {}
+                for key, value in pairs(base) do data[key] = value end
+                data.Name = name
+                data.Type = data.Type or cosmeticType
+                data.Seed = data.Seed or math.random(1, 1000000)
+                if EnumLibrary then
+                    local success, enumId = pcall(function() return EnumLibrary:ToEnum(name) end)
+                    if success and enumId then
+                        data.Enum = enumId
+                        data.ObjectID = data.ObjectID or enumId
+                    end
+                end
+                if options then
+                    if options.inverted ~= nil then data.Inverted = options.inverted end
+                    if options.favoritesOnly ~= nil then data.OnlyUseFavorites = options.favoritesOnly end
+                end
+                return data
+            end
+
+            local saveFile = "unlockall/config.json"
+            local function saveConfig()
+                if not writefile then return end
+                pcall(function()
+                    local config = {equipped = {}, favorites = favorites}
+                    for weapon, cosmetics in pairs(equipped) do
+                        config.equipped[weapon] = {}
+                        for cosmeticType, cosmeticData in pairs(cosmetics) do
+                            if cosmeticData and cosmeticData.Name then
+                                config.equipped[weapon][cosmeticType] = {
+                                    name = cosmeticData.Name,
+                                    seed = cosmeticData.Seed,
+                                    inverted = cosmeticData.Inverted,
+                                }
+                            end
+                        end
+                    end
+                    if makefolder then makefolder("unlockall") end
+                    writefile(saveFile, HttpService:JSONEncode(config))
+                end)
+            end
+
+            local function loadConfig()
+                if not readfile or not isfile or not isfile(saveFile) then return end
+                pcall(function()
+                    local config = HttpService:JSONDecode(readfile(saveFile))
+                    if config.equipped then
+                        for weapon, cosmetics in pairs(config.equipped) do
+                            equipped[weapon] = {}
+                            for cosmeticType, cosmeticData in pairs(cosmetics) do
+                                local cloned = cloneCosmetic(cosmeticData.name, cosmeticType, {inverted = cosmeticData.inverted})
+                                if cloned then
+                                    cloned.Seed = cosmeticData.seed
+                                    equipped[weapon][cosmeticType] = cloned
+                                end
+                            end
+                        end
+                    end
+                    favorites = config.favorites or {}
+                end)
+            end
+
+            local originalOwnsCosmetic = CosmeticLibrary.OwnsCosmetic
+            CosmeticLibrary.OwnsCosmetic = function(self, inventory, name, weapon)
+                if type(name) == "string" and name:find("MISSING_") then
+                    return originalOwnsCosmetic(self, inventory, name, weapon)
+                end
+                local cosmetic = CosmeticLibrary.Cosmetics[name]
+                if isAllowedCosmetic(cosmetic, name) then return true end
+                return originalOwnsCosmetic(self, inventory, name, weapon)
+            end
+
+            pcall(function()
+                CosmeticLibrary.OwnsCosmeticNormally = function(self, inventory, name, weapon)
+                    local cosmetic = CosmeticLibrary.Cosmetics[name]
+                    if isAllowedCosmetic(cosmetic, name) then return true end
+                    return false
+                end
+                CosmeticLibrary.OwnsCosmeticUniversally = CosmeticLibrary.OwnsCosmeticNormally
+                CosmeticLibrary.OwnsCosmeticForWeapon = CosmeticLibrary.OwnsCosmeticNormally
+            end)
+
+            local originalGet = DataController.Get
+            DataController.Get = function(self, key)
+                local data = originalGet(self, key)
+                if key == "CosmeticInventory" then
+                    local proxy = {}
+                    if data then
+                        for k, v in pairs(data) do
+                            local cosmetic = CosmeticLibrary.Cosmetics[k]
+                            if isAllowedCosmetic(cosmetic, k) then proxy[k] = v end
+                        end
+                    end
+                    return setmetatable(proxy, {
+                        __index = function(_, k)
+                            local cosmetic = CosmeticLibrary.Cosmetics[k]
+                            if isAllowedCosmetic(cosmetic, k) then return true end
+                            return nil
+                        end,
+                    })
+                end
+                if key == "FavoritedCosmetics" then
+                    local result = data and table.clone(data) or {}
+                    for weapon, favs in pairs(favorites) do
+                        result[weapon] = result[weapon] or {}
+                        for name, isFav in pairs(favs) do
+                            local cosmetic = CosmeticLibrary.Cosmetics[name]
+                            if isAllowedCosmetic(cosmetic, name) then
+                                result[weapon][name] = isFav
+                            end
+                        end
+                    end
+                    return result
+                end
+                return data
+            end
+
+            local originalGetWeaponData = DataController.GetWeaponData
+            DataController.GetWeaponData = function(self, weaponName)
+                local data = originalGetWeaponData(self, weaponName)
+                if not data then return nil end
+                local merged = {}
+                for key, value in pairs(data) do merged[key] = value end
+                merged.Name = weaponName
+                if equipped[weaponName] then
+                    for cosmeticType, cosmeticData in pairs(equipped[weaponName]) do
+                        merged[cosmeticType] = cosmeticData
+                    end
+                end
+                return merged
+            end
+
+            local FighterController
+            pcall(function()
+                FighterController = require(controllers:WaitForChild("FighterController", 10))
+            end)
+
+            if typeof(hookmetamethod) == "function" and typeof(getnamecallmethod) == "function" then
+                local remotes = RS:FindFirstChild("Remotes")
+                local dataRemotes = remotes and remotes:FindFirstChild("Data")
+                local equipRemote = dataRemotes and dataRemotes:FindFirstChild("EquipCosmetic")
+                local favoriteRemote = dataRemotes and dataRemotes:FindFirstChild("FavoriteCosmetic")
+                local useItemRemote = nil
+                pcall(function()
+                    useItemRemote = remotes.Replication.Fighter.UseItem
+                end)
+
+                if equipRemote then
+                    local oldNamecall
+                    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+                        if getnamecallmethod() ~= "FireServer" then
+                            return oldNamecall(self, ...)
+                        end
+                        local args = {...}
+                        if useItemRemote and self == useItemRemote and FighterController then
+                            pcall(function()
+                                local objectID = args[1]
+                                local fighter = FighterController:GetFighter(player)
+                                if fighter and fighter.Items then
+                                    for _, item in pairs(fighter.Items) do
+                                        if item:Get("ObjectID") == objectID then
+                                            lastUsedWeapon = item.Name
+                                            break
+                                        end
+                                    end
+                                end
+                            end)
+                        end
+                        if self == equipRemote then
+                            local weaponName, cosmeticType, cosmeticName, options = args[1], args[2], args[3], args[4] or {}
+                            local cosmetic = CosmeticLibrary.Cosmetics[cosmeticName]
+                            if not isAllowedCosmetic(cosmetic, cosmeticName) and cosmeticType ~= "Skin" and cosmeticType ~= "Charm"
+                                and cosmeticType ~= "Dance" and cosmeticType ~= "Emote" and cosmeticType ~= "Wrap" and cosmeticType ~= "Wrapping" then
+                                return oldNamecall(self, ...)
+                            end
+                            if cosmeticName and cosmeticName ~= "None" and cosmeticName ~= "" then
+                                local inventory = DataController:Get("CosmeticInventory")
+                                if inventory and rawget(inventory, cosmeticName) then
+                                    return oldNamecall(self, ...)
+                                end
+                            end
+                            equipped[weaponName] = equipped[weaponName] or {}
+                            if not cosmeticName or cosmeticName == "None" or cosmeticName == "" then
+                                equipped[weaponName][cosmeticType] = nil
+                                if not next(equipped[weaponName]) then equipped[weaponName] = nil end
+                            else
+                                local cloned = cloneCosmetic(cosmeticName, cosmeticType, {
+                                    inverted = options.IsInverted,
+                                    favoritesOnly = options.OnlyUseFavorites,
+                                })
+                                if cloned then equipped[weaponName][cosmeticType] = cloned end
+                            end
+                            task.defer(function()
+                                pcall(function() DataController.CurrentData:Replicate("WeaponInventory") end)
+                                task.wait(0.2)
+                                saveConfig()
+                            end)
+                            return
+                        end
+                        if self == favoriteRemote then
+                            local cosmetic = CosmeticLibrary.Cosmetics[args[2]]
+                            if isAllowedCosmetic(cosmetic, args[2]) then
+                                favorites[args[1]] = favorites[args[1]] or {}
+                                favorites[args[1]][args[2]] = args[3] or nil
+                                saveConfig()
+                                task.spawn(function()
+                                    pcall(function() DataController.CurrentData:Replicate("FavoritedCosmetics") end)
+                                end)
+                            end
+                            return
+                        end
+                        return oldNamecall(self, ...)
+                    end)
+                end
+            end
+
+            local ClientItem
+            pcall(function()
+                ClientItem = require(player.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem)
+            end)
+
+            if ClientItem and ClientItem._CreateViewModel then
+                local originalCreateViewModel = ClientItem._CreateViewModel
+                ClientItem._CreateViewModel = function(self, viewmodelRef)
+                    local weaponName = self.Name
+                    local weaponPlayer = self.ClientFighter and self.ClientFighter.Player
+                    constructingWeapon = (weaponPlayer == player) and weaponName or nil
+                    if weaponPlayer == player and equipped[weaponName] and viewmodelRef then
+                        local cos = equipped[weaponName]
+                        pcall(function()
+                            local dataKey = self:ToEnum("Data")
+                            local data = viewmodelRef[dataKey] or viewmodelRef.Data
+                            if data then
+                                if cos.Skin then
+                                    local skinKey = self:ToEnum("Skin")
+                                    data[skinKey] = cos.Skin
+                                    data.Skin = cos.Skin
+                                end
+                                if cos.Charm then
+                                    local charmKey = self:ToEnum("Charm")
+                                    data[charmKey] = cos.Charm
+                                    data.Charm = cos.Charm
+                                end
+                                if cos.Wrap then
+                                    local wrapKey = self:ToEnum("Wrap")
+                                    data[wrapKey] = cos.Wrap
+                                    data.Wrap = cos.Wrap
+                                end
+                            end
+                        end)
+                    end
+                    local result = originalCreateViewModel(self, viewmodelRef)
+                    constructingWeapon = nil
+                    return result
+                end
+            end
+
+            pcall(function()
+                local EmoteController = require(controllers:WaitForChild("EmoteController", 10))
+                if EmoteController and EmoteController.GetEmotes then
+                    local originalGetEmotes = EmoteController.GetEmotes
+                    EmoteController.GetEmotes = function(self)
+                        local emotes = originalGetEmotes(self)
+                        for name, cosmetic in pairs(CosmeticLibrary.Cosmetics) do
+                            if isAllowedCosmetic(cosmetic, name) and (cosmetic.Type == "Dance" or cosmetic.Type == "Emote") then
+                                if not emotes[name] then
+                                    emotes[name] = {
+                                        Name = name,
+                                        Type = cosmetic.Type,
+                                        ObjectID = cosmetic.ObjectID,
+                                        Enum = cosmetic.Enum,
+                                    }
+                                end
+                            end
+                        end
+                        return emotes
+                    end
+                end
+            end)
+
+            pcall(function()
+                local ViewProfile = require(player.PlayerScripts.Modules.Pages.ViewProfile)
+                if ViewProfile and ViewProfile.Fetch then
+                    local originalFetch = ViewProfile.Fetch
+                    ViewProfile.Fetch = function(self, targetPlayer)
+                        viewingProfile = targetPlayer
+                        return originalFetch(self, targetPlayer)
+                    end
+                end
+            end)
+
+            loadConfig()
+            pcall(function()
+                nexlib:Notification("unlock all", "skins/charms/dances/wraps unlocked", 3)
+            end)
+        end)
+        if not ok then
+            pcall(function()
+                nexlib:Notification("unlock all", "failed: " .. tostring(err), 3)
+            end)
+        end
+    end)
+end
+
 -----------------------------------------------------------
 -- [UI]
 -----------------------------------------------------------
-local MyGuiWindow = nexlib:Window("Hackerblox 허브")
+local MyGuiWindow = nexlib:Window("hackerblox / 저 옾챗 10월5일까지 정지당함")
 
 local Tabs = {
     ["main"] = MyGuiWindow:Tab("main"),
@@ -2050,7 +2395,7 @@ local Tabs = {
 local RagebotGroup = Tabs["main"]:Section("ragebot", 1)
 RagebotGroup:Toggle("enabled", false, function(v) 
     projectileEnabled = v
-    pcall(function() _startRagebot(v) end)
+    pcall(function() _startRagebot(v or farmRageEnabled) end)
     nexlib:Notification("ragebot", v and "on" or "off", 1.5)
 end)
 RagebotGroup:Toggle("aimbot", false, function(v)
@@ -2123,14 +2468,13 @@ MatchGroup:Toggle("Auto Respawn", false, function(v)
     nexlib:Notification("Auto Respawn", v and "on" or "off", 1.5)
 end)
 
-local FarmRageGroup = Tabs["autofarm"]:Section("rage", 1)
+local FarmRageGroup = Tabs["autofarm"]:Section("ragebot", 1)
 FarmRageGroup:Toggle("enabled", false, function(v)
     farmRageEnabled = v
-    nexlib:Notification("farm rage", v and "on" or "off", 1.5)
+    pcall(function() _startRagebot(v or projectileEnabled) end)
+    nexlib:Notification("farm ragebot", v and "height 18 on" or "off", 1.5)
 end)
-FarmRageGroup:Slider("head height", 1, 50, farmRageHeight, function(v)
-    farmRageHeight = v
-end)
+FarmRageGroup:Label("same as main · tp height 18")
 
 local AutoBanGroup = Tabs["autofarm"]:Section("auto ban", 2)
 AutoBanGroup:Toggle("enabled", false, function(v)
@@ -2149,6 +2493,17 @@ for _, weaponName in ipairs(BAN_WEAPON_LIST) do
         end
     end)
 end
+
+local CosmeticGroup = Tabs["main"]:Section("cosmetics", 1)
+CosmeticGroup:Toggle("unlock all", false, function(v)
+    unlockAllEnabled = v
+    if v then
+        startUnlockAll()
+        nexlib:Notification("unlock all", "on", 1.5)
+    else
+        nexlib:Notification("unlock all", "off (reload to fully reset)", 2)
+    end
+end)
 
 local WeaponModGroup = Tabs["main"]:Section("weapon mods", 1)
 WeaponModGroup:Toggle("fast fire", false, function(v)
@@ -2244,10 +2599,11 @@ SettingsGroup:Button("unload script", function()
     fastMeleeEnabled = false
     pcall(restoreFastWeapons)
     projectileEnabled = false
+    farmRageEnabled = false
     pcall(function() _startRagebot(false) end)
     aimbotEnabled = false
     behindTPEnabled = false
-    farmRageEnabled = false
+
     voidSpamEnabled = false
     voidCanAct = true
     espEnabled = false
