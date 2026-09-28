@@ -5,6 +5,16 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local UIS = game:GetService("UserInputService")
 local isMobile = UIS.TouchEnabled and not UIS.KeyboardEnabled
+-- UI sizes (mobile vs desktop)
+local UI_W = isMobile and 340 or 525
+local UI_H = isMobile and 480 or 631
+local UI_COL_W = isMobile and 158 or 245
+local UI_COL2_X = isMobile and 168 or 255
+local UI_TAB_H = isMobile and 30 or 26
+local UI_TOGGLE_H = isMobile and 28 or 22
+local UI_BTN_H = isMobile and 28 or 22
+local UI_TEXT = isMobile and 12 or 14
+local UI_SMALL = isMobile and 11 or 13
 
 -- common executor shims (Delta / mobile)
 pcall(function()
@@ -288,7 +298,7 @@ function nexlib:Window(windowTitle)
     mainFrame.BorderColor3 = Color3.fromRGB(60, 60, 60)
     mainFrame.BorderSizePixel = 0;
     mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-    mainFrame.Size = UDim2.new(0, 525, 0, 631)
+    mainFrame.Size = UDim2.new(0, UI_W, 0, UI_H)
     mainFrame.Visible = false
     mainFrame.ClipsDescendants = true
     
@@ -331,7 +341,7 @@ function nexlib:Window(windowTitle)
     topBarTitle.Parent = topBar; topBarTitle.BackgroundTransparency = 1;
     topBarTitle.Position = UDim2.new(0, 7, 0, 5) topBarTitle.Size = UDim2.new(0, 0, 0, 16)
     topBarTitle.Font = Enum.Font.Code; topBarTitle.Text = windowTitle;
-    topBarTitle.TextColor3 = Color3.fromRGB(230, 230, 230) topBarTitle.TextSize = 16; topBarTitle.TextXAlignment = Enum.TextXAlignment.Left;
+    topBarTitle.TextColor3 = Color3.fromRGB(230, 230, 230) topBarTitle.TextSize = isMobile and 14 or 16; topBarTitle.TextXAlignment = Enum.TextXAlignment.Left;
     
     topBarLine.Name = 'TopBarLine'
     topBarLine.Parent = topBar; topBarLine.BackgroundColor3 = nexlib.accentclr;
@@ -393,8 +403,8 @@ function nexlib:Window(windowTitle)
 
     local toggleButton = Instance.new("TextButton")
     toggleButton.Name = "ToggleFrame"
-    toggleButton.Size = UDim2.new(0, 65, 0, 36)
-    toggleButton.Position = UDim2.new(0, 20, 0, 20)
+    toggleButton.Size = UDim2.new(0, isMobile and 80 or 65, 0, isMobile and 44 or 36)
+    toggleButton.Position = UDim2.new(0, isMobile and 12 or 20, 0, isMobile and 12 or 20)
     toggleButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     toggleButton.BorderSizePixel = 0
     toggleButton.Active = true
@@ -459,12 +469,13 @@ function nexlib:Window(windowTitle)
         tabBtn.Font = Enum.Font.Code
         tabBtn.Text = tabName
         tabBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
-        tabBtn.TextSize = 14
+        tabBtn.TextSize = UI_TEXT
         tabBtn.AutoButtonColor = false
         
         local textBoundsService = game:GetService("TextService")
-        local calculatedSize = textBoundsService:GetTextSize(tabName, 14, Enum.Font.Code, Vector2.new(500, 500))
-        tabBtn.Size = UDim2.new(0, calculatedSize.X + 28, 0, 26)
+        local calculatedSize = textBoundsService:GetTextSize(tabName, UI_TEXT, Enum.Font.Code, Vector2.new(500, 500))
+        tabBtn.Size = UDim2.new(0, calculatedSize.X + (isMobile and 22 or 28), 0, UI_TAB_H)
+        tabBtn.TextSize = UI_TEXT
         
         local tabTopLine = Instance.new('Frame')
         tabTopLine.Name = "TopLine"
@@ -495,17 +506,21 @@ function nexlib:Window(windowTitle)
         sectionHolder1.Name = tabName .. '_Holder1'
         sectionHolder1.Parent = containerHolder;
         sectionHolder1.Active = true; sectionHolder1.BackgroundTransparency = 1; sectionHolder1.BorderSizePixel = 0;
-        sectionHolder1.Position = UDim2.new(0, 1, 0, 35) sectionHolder1.Size = UDim2.new(0, 245, 1, -40)
-        sectionHolder1.Visible = false; sectionHolder1.CanvasSize = UDim2.new(0, 0, 0, 0) sectionHolder1.ScrollBarThickness = 4; sectionHolder1.ScrollingEnabled = true;
+        sectionHolder1.Position = UDim2.new(0, 1, 0, isMobile and 32 or 35)
+        sectionHolder1.Size = UDim2.new(0, UI_COL_W, 1, isMobile and -36 or -40)
+        sectionHolder1.Visible = false; sectionHolder1.CanvasSize = UDim2.new(0, 0, 0, 0)
+        sectionHolder1.ScrollBarThickness = isMobile and 6 or 4; sectionHolder1.ScrollingEnabled = true;
         
         shPadding1.Parent = sectionHolder1; shPadding1.PaddingTop = UDim.new(0, 5)
-        shLayout1.Parent = sectionHolder1; shLayout1.SortOrder = Enum.SortOrder.LayoutOrder; shLayout1.Padding = UDim.new(0, 10)
+        shLayout1.Parent = sectionHolder1; shLayout1.SortOrder = Enum.SortOrder.LayoutOrder; shLayout1.Padding = UDim.new(0, isMobile and 8 or 10)
         
         sectionHolder2.Name = tabName .. '_Holder2'
         sectionHolder2.Parent = containerHolder;
         sectionHolder2.Active = true; sectionHolder2.BackgroundTransparency = 1; sectionHolder2.BorderSizePixel = 0;
-        sectionHolder2.Position = UDim2.new(0, 255, 0, 35) sectionHolder2.Size = UDim2.new(0, 245, 1, -40)
-        sectionHolder2.Visible = false; sectionHolder2.CanvasSize = UDim2.new(0, 0, 0, 0) sectionHolder2.ScrollBarThickness = 4; sectionHolder2.ScrollingEnabled = true;
+        sectionHolder2.Position = UDim2.new(0, UI_COL2_X, 0, isMobile and 32 or 35)
+        sectionHolder2.Size = UDim2.new(0, UI_COL_W, 1, isMobile and -36 or -40)
+        sectionHolder2.Visible = false; sectionHolder2.CanvasSize = UDim2.new(0, 0, 0, 0)
+        sectionHolder2.ScrollBarThickness = isMobile and 6 or 4; sectionHolder2.ScrollingEnabled = true;
         
         shPadding2.Parent = sectionHolder2; shPadding2.PaddingTop = UDim.new(0, 5)
         shLayout2.Parent = sectionHolder2; shLayout2.SortOrder = Enum.SortOrder.LayoutOrder; shLayout2.Padding = UDim.new(0, 10)
@@ -598,7 +613,7 @@ function nexlib:Window(windowTitle)
             titleLabel.Name = 'SectionTitle'
             titleLabel.Parent = titleFrame; titleLabel.BackgroundTransparency = 1; titleLabel.Position = UDim2.new(0, 0, 0, -3)
             titleLabel.Size = UDim2.new(1, 0, 0, 7) titleLabel.Font = Enum.Font.Code; titleLabel.Text = sectionName;
-            titleLabel.TextColor3 = Color3.fromRGB(230, 230, 230) titleLabel.TextSize = 14;
+            titleLabel.TextColor3 = Color3.fromRGB(230, 230, 230) titleLabel.TextSize = UI_TEXT;
             
             itemHolder.Name = 'SectionItemHolderFrame'
             itemHolder.Parent = sectionFrame; itemHolder.AnchorPoint = Vector2.new(0.5, 0)
@@ -628,7 +643,7 @@ function nexlib:Window(windowTitle)
                 tBtn.Parent = itemHolder
                 tBtn.BackgroundColor3 = Color3.fromRGB(38, 38, 38)
                 tBtn.BorderSizePixel = 0
-                tBtn.Size = UDim2.new(1, 0, 0, 22)
+                tBtn.Size = UDim2.new(1, 0, 0, UI_TOGGLE_H)
                 tBtn.AutoButtonColor = false
                 tBtn.Text = ''
                 
@@ -662,7 +677,7 @@ function nexlib:Window(windowTitle)
                 tText.Font = Enum.Font.Code
                 tText.Text = text
                 tText.TextColor3 = Color3.fromRGB(190, 190, 190)
-                tText.TextSize = 14
+                tText.TextSize = UI_TEXT
                 tText.TextXAlignment = Enum.TextXAlignment.Left
                 
                 local toggled = default or false
@@ -696,10 +711,10 @@ function nexlib:Window(windowTitle)
                 btn.BackgroundColor3 = Color3.fromRGB(38, 38, 38)
                 btn.BorderColor3 = nexlib.accentclr;
                 btn.BorderSizePixel = 0;
-                btn.Size = UDim2.new(1, 0, 0, 20)
+                btn.Size = UDim2.new(1, 0, 0, UI_BTN_H)
                 btn.AutoButtonColor = false; btn.Font = Enum.Font.Code;
                 btn.TextColor3 = Color3.fromRGB(230, 230, 230)
-                btn.TextSize = 14; btn.Text = text;
+                btn.TextSize = UI_TEXT; btn.Text = text;
                 
                 ao.Name = 'ButtonOutline1'
                 ao.Parent = btn; ao.BackgroundTransparency = 1; ao.Size = UDim2.new(1, 0, 1, 0)
@@ -726,9 +741,9 @@ function nexlib:Window(windowTitle)
                 local label = Instance.new('TextLabel')
                 
                 label.Name = 'Label'
-                label.Parent = itemHolder; label.BackgroundTransparency = 1; label.Size = UDim2.new(1, 0, 0, 18)
+                label.Parent = itemHolder; label.BackgroundTransparency = 1; label.Size = UDim2.new(1, 0, 0, isMobile and 16 or 18)
                 label.Font = Enum.Font.Code; label.Text = text; label.TextColor3 = Color3.fromRGB(230, 230, 230)
-                label.TextSize = 14; label.TextXAlignment = Enum.TextXAlignment.Left;
+                label.TextSize = UI_TEXT; label.TextXAlignment = Enum.TextXAlignment.Left;
                 
                 updateSectionSize()
                 
@@ -741,7 +756,7 @@ function nexlib:Window(windowTitle)
                 holder.Name = 'Slider'
                 holder.Parent = itemHolder
                 holder.BackgroundTransparency = 1
-                holder.Size = UDim2.new(1, 0, 0, 32)
+                holder.Size = UDim2.new(1, 0, 0, isMobile and 36 or 32)
 
                 local title = Instance.new('TextLabel')
                 title.Parent = holder
@@ -750,7 +765,7 @@ function nexlib:Window(windowTitle)
                 title.Font = Enum.Font.Code
                 title.Text = text
                 title.TextColor3 = Color3.fromRGB(190, 190, 190)
-                title.TextSize = 13
+                title.TextSize = UI_SMALL
                 title.TextXAlignment = Enum.TextXAlignment.Left
 
                 local valLabel = Instance.new('TextLabel')
@@ -761,7 +776,7 @@ function nexlib:Window(windowTitle)
                 valLabel.Font = Enum.Font.Code
                 valLabel.Text = tostring(default)
                 valLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-                valLabel.TextSize = 13
+                valLabel.TextSize = UI_SMALL
                 valLabel.TextXAlignment = Enum.TextXAlignment.Right
 
                 local track = Instance.new('Frame')
@@ -817,7 +832,7 @@ function nexlib:Window(windowTitle)
                 holder.Name = 'Dropdown'
                 holder.Parent = itemHolder
                 holder.BackgroundTransparency = 1
-                holder.Size = UDim2.new(1, 0, 0, 42)
+                holder.Size = UDim2.new(1, 0, 0, isMobile and 48 or 42)
                 holder.ClipsDescendants = false
 
                 local title = Instance.new('TextLabel')
@@ -827,7 +842,7 @@ function nexlib:Window(windowTitle)
                 title.Font = Enum.Font.Code
                 title.Text = text
                 title.TextColor3 = Color3.fromRGB(190, 190, 190)
-                title.TextSize = 13
+                title.TextSize = UI_SMALL
                 title.TextXAlignment = Enum.TextXAlignment.Left
 
                 local btn = Instance.new('TextButton')
@@ -835,11 +850,11 @@ function nexlib:Window(windowTitle)
                 btn.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
                 btn.BorderSizePixel = 0
                 btn.Position = UDim2.new(0, 0, 0, 16)
-                btn.Size = UDim2.new(1, 0, 0, 22)
+                btn.Size = UDim2.new(1, 0, 0, isMobile and 28 or 22)
                 btn.Font = Enum.Font.Code
                 btn.Text = "  " .. tostring(default)
                 btn.TextColor3 = Color3.fromRGB(230, 230, 230)
-                btn.TextSize = 13
+                btn.TextSize = UI_TEXT
                 btn.TextXAlignment = Enum.TextXAlignment.Left
                 btn.AutoButtonColor = false
 
@@ -877,7 +892,7 @@ function nexlib:Window(windowTitle)
 
                 local open = false
                 local selected = default
-                local optionH = 20
+                local optionH = isMobile and 26 or 20
 
                 for i, opt in ipairs(options) do
                     local ob = Instance.new('TextButton')
@@ -2176,7 +2191,7 @@ MobileSettingGroup:Toggle("mobile on", false, function(v)
             container.Size = UDim2.new(1, -18, 1, -42)
         end
         local tweenService = game:GetService("TweenService")
-        local targetSize = v and UDim2.new(0, 525, 0, 450) or UDim2.new(0, 525, 0, 631)
+        local targetSize = v and UDim2.new(0, UI_W, 0, math.floor(UI_H * 0.75)) or UDim2.new(0, UI_W, 0, UI_H)
         tweenService:Create(mainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
             Size = targetSize
         }):Play()
