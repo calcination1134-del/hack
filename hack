@@ -1082,13 +1082,13 @@ local aimbotFov = 250 -- pixels; 0 = no limit
 local aimbotTeamCheck = true
 local aimbotWallCheck = true -- only track if visible (no wall)
 
--- Void spam (Halmu-style: attack window / hide in void)
-local voidSpamEnabled = false
-local voidAttackTime = 0.10
-local voidHideTime = 0.25
-local voidHeight = 500
-local voidCanAct = true
-local voidSavedCFrame = nil
+-- Void spam (Halmu exact: can-act cycle + height lock)
+local voidSpamEnabled = false      -- _lII0ll cycle
+local heightLockEnabled = false    -- Halmu height lock void spam
+local voidAttackTime = 0.10        -- a85b57c99
+local voidHideTime = 0.25          -- _4012x732
+local lockHeight = 50              -- Halmu lockHeight / void spam studs
+local voidCanAct = true            -- _2631x704
 
 local espEnabled = false
 local espBoxes = true
@@ -1504,33 +1504,23 @@ RunService.RenderStepped:Connect(function()
     end)
 end)
 
--- Void spam cycle: brief attack window then hide in void (Halmu style)
+-- Halmu voidspam cycle: attack window (can act) -> hide window (cannot act)
+-- Only runs when void spam + ragebot (main or farm) is on, same as Halmu (_lII0ll and L555_61)
 task.spawn(function()
     while true do
-        if voidSpamEnabled then
-            -- attack phase
+        local rageOn = projectileEnabled or farmRageEnabled
+        if voidSpamEnabled and rageOn then
             voidCanAct = true
             local atk = voidAttackTime
             if typeof(atk) ~= "number" or atk < 0.01 then atk = 0.01 end
             task.wait(atk)
-
-            if not voidSpamEnabled then
-                voidCanAct = true
-            else
-                -- hide phase: go into void
+            if voidSpamEnabled and (projectileEnabled or farmRageEnabled) then
                 voidCanAct = false
-                pcall(function()
-                    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                    if hrp then
-                        voidSavedCFrame = hrp.CFrame
-                        local pos = hrp.Position
-                        hrp.CFrame = CFrame.new(pos.X, pos.Y + voidHeight, pos.Z)
-                        hrp.AssemblyLinearVelocity = Vector3.zero
-                    end
-                end)
                 local hide = voidHideTime
                 if typeof(hide) ~= "number" or hide < 0.01 then hide = 0.01 end
                 task.wait(hide)
+            else
+                voidCanAct = true
             end
         else
             voidCanAct = true
@@ -1539,17 +1529,15 @@ task.spawn(function()
     end
 end)
 
--- While hiding, keep character in void each frame
+-- Halmu height lock void spam: pin Y to lockHeight every frame
 RunService.Heartbeat:Connect(function()
-    if not voidSpamEnabled or voidCanAct then return end
+    if not heightLockEnabled then return end
     pcall(function()
-        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
-        local pos = hrp.Position
-        if pos.Y < (voidHeight * 0.5) then
-            hrp.CFrame = CFrame.new(pos.X, pos.Y + voidHeight, pos.Z)
-            hrp.AssemblyLinearVelocity = Vector3.zero
-        end
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if not hrp or (hum and hum.Health <= 0) then return end
+        hrp.CFrame = CFrame.new(hrp.Position.X, lockHeight, hrp.Position.Z)
     end)
 end)
 
@@ -2413,20 +2401,22 @@ RagebotGroup:Slider("aim fov", 0, 500, aimbotFov, function(v)
     aimbotFov = v
 end)
 RagebotGroup:Toggle("void spam", false, function(v)
+    -- Halmu: voidspam cycle + height lock together
     voidSpamEnabled = v
+    heightLockEnabled = v
     if not v then
         voidCanAct = true
     end
     nexlib:Notification("void spam", v and "on" or "off", 1.5)
 end)
-RagebotGroup:Slider("void attack", 1, 100, math.floor(voidAttackTime * 100), function(v)
-    voidAttackTime = v / 100
-end)
-RagebotGroup:Slider("void hide", 1, 100, math.floor(voidHideTime * 100), function(v)
+RagebotGroup:Slider("hide", 1, 100, math.floor(voidHideTime * 100), function(v)
     voidHideTime = v / 100
 end)
-RagebotGroup:Slider("void height", 50, 5000, voidHeight, function(v)
-    voidHeight = v
+RagebotGroup:Slider("attack", 1, 100, math.floor(voidAttackTime * 100), function(v)
+    voidAttackTime = v / 100
+end)
+RagebotGroup:Slider("void spam studs", 50, 500000, lockHeight, function(v)
+    lockHeight = v
 end)
 
 local BehindGroup = Tabs["main"]:Section("behind tp", 1)
@@ -2605,6 +2595,7 @@ SettingsGroup:Button("unload script", function()
     behindTPEnabled = false
 
     voidSpamEnabled = false
+    heightLockEnabled = false
     voidCanAct = true
     espEnabled = false
 
